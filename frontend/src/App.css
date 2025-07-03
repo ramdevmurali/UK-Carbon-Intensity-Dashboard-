@@ -1,88 +1,158 @@
-/* === Styles for New Features === */
+/* frontend/src/App.css */
 
-.section-box {
-  background-color: #383c44;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 30px;
-  width: 90%;
-  max-width: 700px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+/* === Base Styles & Variables === */
+:root {
+  --background-color: #1a1b1e; /* A softer, deep blue-grey */
+  --card-background: #242529;   /* A slightly lighter grey for cards */
+  --text-primary: #f0f0f0;       /* Off-white for readability */
+  --text-secondary: #a9a9a9;     /* A softer grey for secondary text */
+  --accent-color: #00bcd4;       /* A vibrant cyan accent */
+  --border-color: #36373b;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif; /* Use our new font */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-color);
+  color: var(--text-primary);
+}
+
+/* === Main App Layout === */
+.App {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+/* === Reusable Card Component Style === */
+.section-box {
+  background-color: var(--card-background);
+  border-radius: 16px;
+  padding: 30px;
+  margin-bottom: 30px;
+  width: 100%;
+  max-width: 600px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+}
+
+.section-box h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.section-box h3 {
+  margin-top: 0;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+/* === Current Intensity "Hero" Section === */
+.hero-value {
+  font-size: 5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-color);
+  margin: 10px 0;
+}
+
+.hero-unit {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
 }
 
 .intensity-badge {
-  padding: 15px 25px;
-  border-radius: 8px;
+  padding: 10px 25px;
+  border-radius: 50px; /* Pill shape */
   color: white;
   text-transform: uppercase;
-  font-weight: bold;
-  font-size: 1.5em;
+  font-weight: 700;
+  font-size: 1.2rem;
   display: inline-block;
 }
 
-.optimizer-controls {
+
+/* === Optimizer Preset Buttons === */
+.optimizer-presets {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
   gap: 15px;
-  margin-top: 15px;
-}
-
-.optimizer-controls input {
-  font-size: 1.2rem;
-  padding: 10px;
-  width: 200px;
-  border: 1px solid #555;
-  border-radius: 6px;
-  background-color: #282c34;
-  color: white;
-  text-align: center;
-}
-
-.optimizer-controls button {
-  font-size: 1.2rem;
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  background-color: #61dafb;
-  color: #282c34;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s, opacity 0.2s;
-}
-
-.optimizer-controls button:hover {
-  background-color: #79e2ff;
-}
-
-.optimizer-controls button:disabled {
-  background-color: #555;
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.optimizer-result {
   margin-top: 20px;
-  font-size: 1.2rem;
-  background-color: #282c34;
-  padding: 15px;
+  margin-bottom: 25px;
+}
+
+.preset-button {
+  font-size: 1rem;
+  padding: 12px 20px;
   border-radius: 8px;
+  border: 2px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease-in-out;
 }
 
-.optimizer-result strong {
-  color: #61dafb; /* Light blue for the time */
-  font-size: 1.5rem;
+.preset-button:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
-.chart-container {
-  width: 90%;
-  max-width: 900px;
-  background-color: white;
+.preset-button.active {
+  background-color: var(--accent-color);
+  color: var(--background-color);
+  border-color: var(--accent-color);
+}
+
+
+/* === Optimizer Result Display === */
+.optimizer-result {
+  margin-top: 25px;
+  font-size: 1.1rem;
+  background-color: rgba(0,0,0,0.2);
   padding: 20px;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
+.optimizer-result p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.result-time {
+  color: var(--accent-color);
+  font-size: 2.5rem;
+  font-weight: 700;
+  display: block;
+  margin-top: 5px;
+}
+
+.result-savings {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-top: 10px;
+}
+
+/* === Chart Container === */
+.chart-container {
+  width: 100%;
+  max-width: 900px;
+  background-color: var(--card-background); /* Match the card background */
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+}
+
+/* === General Error Text === */
 .error-text {
-  color: #ff9a9a; /* A softer red for errors */
+  color: #ff9a9a;
 }
