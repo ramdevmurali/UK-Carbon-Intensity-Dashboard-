@@ -94,25 +94,57 @@ function App() {
   const [isLoadingBestTime, setIsLoadingBestTime] = useState(false);
   const [selectedAppliance, setSelectedAppliance] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [currentResponse, forecastResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/api/v1/intensity/current`),
-            fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
-        ]);
-        if (!currentResponse.ok || !forecastResponse.ok) throw new Error('Network response was not ok');
-        const currentData = await currentResponse.json();
-        const forecastArr = await forecastResponse.json();
-        setIntensityData(currentData); setForecastData(forecastArr); setError('');
-      } catch (error) {
-        setError('Could not fetch initial data from the backend.');
+// frontend/src/App.js
+
+// Find the existing useEffect block and replace it with this one.
+
+useEffect(() => {
+  console.log(`EFFECT SETUP: Component mounted at ${new Date().toLocaleTimeString()}`);
+  let isMounted = true; // A flag to track if the component is still mounted
+
+  const fetchData = async () => {
+    // Don't fetch if the component has been unmounted
+    if (!isMounted) return;
+
+    console.log(`TIMER FIRED: Fetching data at ${new Date().toLocaleTimeString()}`);
+    try {
+      const [currentResponse, forecastResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/intensity/current`),
+        fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
+      ]);
+      
+      // After fetching, check again if the component is still mounted before updating state
+      if (!isMounted) return;
+
+      if (!currentResponse.ok || !forecastResponse.ok) throw new Error('A network response was not ok');
+      
+      const currentData = await currentResponse.json();
+      const forecastArr = await forecastResponse.json();
+      
+      setIntensityData(currentData);
+      setForecastData(forecastArr);
+      setError('');
+    } catch (error) {
+      if (isMounted) {
+        setError('Could not fetch data from the backend.');
       }
-    };
-    fetchData();
-    const intervalId = setInterval(fetchData, 180000);
-    return () => clearInterval(intervalId);
-  }, []);
+    }
+  };
+
+  // Initial fetch
+  fetchData();
+
+  // Set up the interval
+  const intervalId = setInterval(fetchData, 180000);
+  console.log(`EFFECT SETUP: Interval with ID ${intervalId} has been set.`);
+
+  // Return the cleanup function
+  return () => {
+    console.log(`EFFECT CLEANUP: Component unmounting, clearing interval ID ${intervalId}`);
+    isMounted = false; // Set the flag to false
+    clearInterval(intervalId);
+  };
+}, []); // The empty array is still correct, it should only run on mount
 
   const handlePresetClick = async (appliance) => {
     setSelectedAppliance(appliance);
