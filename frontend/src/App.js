@@ -17,20 +17,39 @@ const APPLIANCE_PRESETS = [
 ];
 
 /**
- * A dedicated component to render the THEMED forecast chart.
+ * A dedicated component to render the THEMED forecast chart
+ * with smarter, context-aware labels.
  */
 const ForecastChart = ({ forecastData }) => {
   if (!forecastData || forecastData.length === 0) return <p>Loading forecast chart...</p>;
 
+  // A variable to keep track of the last day processed.
+  let lastDay = null;
+
   const chartData = {
-    labels: forecastData.map(d => new Date(d.from).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })),
+    // ===============================================
+    // === NEW, SMARTER LABEL GENERATION LOGIC ===
+    // ===============================================
+    labels: forecastData.map(d => {
+      const date = new Date(d.from);
+      const currentDay = date.toDateString(); // Get a string like "Thu Jul 04 2024"
+
+      // Check if the day has changed since the last label.
+      if (currentDay !== lastDay) {
+        lastDay = currentDay;
+        // If it's a new day, return a full, readable date format.
+        return date.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' });
+      } else {
+        // If it's the same day, just return the time.
+        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      }
+    }),
     datasets: [{
       label: 'Carbon Intensity Forecast (gCO₂/kWh)',
       data: forecastData.map(d => d.intensity.forecast),
-      borderColor: '#00bcd4', // Use our new accent color
+      borderColor: '#00bcd4',
       backgroundColor: 'rgba(0, 188, 212, 0.1)',
       tension: 0.2,
-      pointBackgroundColor: '#00bcd4',
       pointRadius: 1,
     }],
   };
@@ -39,18 +58,22 @@ const ForecastChart = ({ forecastData }) => {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'top', labels: { color: '#f0f0f0' } }, // Themed labels
-      title: { display: true, text: '48-Hour Carbon Intensity Forecast', color: '#f0f0f0' }, // Themed title
+      legend: { position: 'top', labels: { color: '#f0f0f0' } },
+      title: { display: true, text: '48-Hour Carbon Intensity Forecast', color: '#f0f0f0' },
     },
     scales: {
       y: {
-        beginAtZero: false,
-        ticks: { color: '#a9a9a9' }, // Themed Y-axis labels
-        grid: { color: 'rgba(240, 240, 240, 0.1)' } // Themed grid lines
+        ticks: { color: '#a9a9a9' },
+        grid: { color: 'rgba(240, 240, 240, 0.1)' }
       },
       x: {
-        ticks: { color: '#a9a9a9' }, // Themed X-axis labels
-        grid: { color: 'rgba(240, 240, 240, 0.1)' } // Themed grid lines
+        ticks: {
+          color: '#a9a9a9',
+          // Auto-rotate labels to prevent them from crashing into each other.
+          maxRotation: 45,
+          minRotation: 45,
+        },
+        grid: { color: 'rgba(240, 240, 240, 0.1)' }
       }
     },
   };
@@ -61,6 +84,7 @@ const ForecastChart = ({ forecastData }) => {
 
 /**
  * The main application component.
+ * No logical changes needed here.
  */
 function App() {
   const [intensityData, setIntensityData] = useState(null);
@@ -71,23 +95,22 @@ function App() {
   const [selectedAppliance, setSelectedAppliance] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => { /* ... same fetching logic as before ... */ };
-    const initialFetch = async () => {
-        try {
-            const [currentResponse, forecastResponse] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/v1/intensity/current`),
-                fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
-            ]);
-            if (!currentResponse.ok || !forecastResponse.ok) throw new Error('Network response was not ok');
-            const currentData = await currentResponse.json();
-            const forecastArr = await forecastResponse.json();
-            setIntensityData(currentData); setForecastData(forecastArr); setError('');
-        } catch (error) {
-            setError('Could not fetch initial data from the backend.');
-        }
+    const fetchData = async () => {
+      try {
+        const [currentResponse, forecastResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/v1/intensity/current`),
+            fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
+        ]);
+        if (!currentResponse.ok || !forecastResponse.ok) throw new Error('Network response was not ok');
+        const currentData = await currentResponse.json();
+        const forecastArr = await forecastResponse.json();
+        setIntensityData(currentData); setForecastData(forecastArr); setError('');
+      } catch (error) {
+        setError('Could not fetch initial data from the backend.');
+      }
     };
-    initialFetch();
-    const intervalId = setInterval(initialFetch, 180000);
+    fetchData();
+    const intervalId = setInterval(fetchData, 180000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -95,7 +118,6 @@ function App() {
     setSelectedAppliance(appliance);
     setIsLoadingBestTime(true);
     setBestTime(null);
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/optimizer/best-time?duration_minutes=${appliance.duration}&power_kw=${appliance.power_kw}`);
       if (!response.ok) {
@@ -147,7 +169,6 @@ function App() {
             </button>
           ))}
         </div>
-
         {bestTime && (
           <div className="optimizer-result">
             {bestTime.error ? (
