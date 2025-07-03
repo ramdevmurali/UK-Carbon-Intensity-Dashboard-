@@ -1,0 +1,25 @@
+cat << EOF > .gitignore
+# Python artifacts
+__pycache__/
+venv/
+*.pyc
+.env
+
+# Node artifacts
+node_modules/
+build/
+.pnp
+.pnp.js
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS-generated files
+.DS_Store
+EOF
