@@ -13,7 +13,7 @@ API_BASE_URL = "https://api.carbonintensity.org.uk"
 app = FastAPI(
     title="UK Carbon Intensity API",
     description="A proxy API for the UK National Grid Carbon Intensity data.",
-    version="2.5.0", # The "Dropdown Ready Backend" version
+    version="2.4.1", # The "Region Name Corrected" version
 )
 origins = ["*"]
 app.add_middleware(
@@ -22,9 +22,7 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
-# --- Canonical List of Region Shortnames (for the dropdown) ---
-# This list is based on common regions found in the Carbon Intensity API documentation.
-# We'll use this to populate the frontend dropdown.
+# --- Canonical List of Region Shortnames (CORRECTED) ---
 CANONICAL_REGION_SHORTNAMES = sorted([
     "East England",
     "East Midlands",
@@ -35,12 +33,9 @@ CANONICAL_REGION_SHORTNAMES = sorted([
     "South East England",
     "South Scotland",
     "South Wales",
-    "South Western England",
+    "South West England", # CORRECTED: Removed 'ern'
     "West Midlands",
     "Yorkshire"
-    # Note: Some regions might appear differently or combine in the API responses,
-    # but these are generally recognized 'shortnames'. We'll stick to ones
-    # that appear in the API's 'shortname' field from successful queries.
 ])
 
 
@@ -50,11 +45,9 @@ def fetch_from_api(url: str):
         logger.info(f"Fetching data from external URL: {url}")
         response = requests.get(url)
         response.raise_for_status()
-
         if response.text == 'null':
             logger.warning(f"API returned 'null' for URL: {url}. Returning empty dictionary.")
             return {}
-
         return response.json()
     except requests.exceptions.RequestException as e:
         logger.error(f"Network error or HTTP status error for {url}: {e}")
@@ -66,15 +59,8 @@ def fetch_from_api(url: str):
         raise HTTPException(status_code=500, detail="An unexpected internal error occurred.")
 
 
-# Removed sanitize_postcode as we are not using postcodes for direct lookup anymore.
-# If we reintroduce a DB for postcode mapping later, this would be relevant again.
-
-
-# --- MODIFIED get_regional_forecast function ---
-# Now explicitly requires region_shortname, no more postcode resolution here.
-def get_regional_forecast(region_shortname: str):
-    
-    # Calculate time boundaries (identical to previous working version)
+# --- get_regional_forecast function (Identical to previous working version) ---
+def get_regional_forecast(region_shortname: str): 
     now_utc = datetime.now(timezone.utc)
     minutes_past_half_hour = now_utc.minute % 30
     start_time = now_utc - timedelta(minutes=minutes_past_half_hour,
@@ -121,38 +107,29 @@ def get_regional_forecast(region_shortname: str):
 @app.get("/")
 def read_root(): return {"status": "ok", "message": "API is stable and correct."}
 
-# --- NEW ENDPOINT: Provide list of regions for frontend dropdown ---
 @app.get("/api/v1/regions")
 def get_available_regions():
-    """Returns a list of canonical region shortnames for the frontend dropdown."""
     return {"regions": CANONICAL_REGION_SHORTNAMES}
 
 @app.get("/api/v1/intensity/current")
 def get_current_intensity():
-    # This endpoint remains national as default.
     data = fetch_from_api(f"{API_BASE_URL}/intensity")
     return data.get('data', [{}])[0]
 
 @app.get("/api/v1/intensity/forecast/48h")
 def get_48h_forecast():
-    # This endpoint remains national as default.
     now_utc = datetime.now(timezone.utc)
     from_iso = now_utc.isoformat().replace('+00:00', 'Z')
     data = fetch_from_api(f"{API_BASE_URL}/intensity/{from_iso}/fw48h")
     return data.get('data', [])
 
-# --- MODIFIED REGIONAL ENDPOINTS TO ACCEPT REGION_SHORTNAME DIRECTLY ---
 @app.get("/api/v1/intensity/regional/current/{region_shortname}")
 def get_current_regional_intensity_by_name(region_shortname: str):
     regional_forecast_container = get_regional_forecast(region_shortname=region_shortname) 
-    
     intensity_periods = regional_forecast_container.get('data', [])
-    
     if not intensity_periods:
         raise HTTPException(status_code=404, detail=f"No current intensity data found for region '{region_shortname}'. This might be due to API data latency for regional data.")
-    
     first_period = intensity_periods[0]
-    
     return {
         "region_name": regional_forecast_container.get('region_name'),
         "from": first_period.get('from'),
@@ -161,25 +138,22 @@ def get_current_regional_intensity_by_name(region_shortname: str):
         "generationmix": first_period.get('generationmix'),
     }
 
-
 @app.get("/api/v1/intensity/regional/forecast/48h/{region_shortname}")
 def get_regional_48h_forecast_endpoint_by_name(region_shortname: str):
     return get_regional_forecast(region_shortname=region_shortname)
 
-
-# --- MODIFIED OPTIMIZER ENDPOINT TO ACCEPT REGION_SHORTNAME ---
 @app.get("/api/v1/optimizer/best-time")
 def find_best_time_with_savings(
     duration_minutes: int = Query(..., gt=0),
     power_kw: float = Query(..., gt=0),
-    region_shortname: str | None = None # Now accepts region_shortname directly
+    region_shortname: str | None = None 
 ):
     forecast_periods = []
     if region_shortname:
         regional_forecast_container = get_regional_forecast(region_shortname=region_shortname)
         forecast_periods = regional_forecast_container.get('data', [])
     else:
-        forecast_periods = get_48h_forecast() # Falls back to national
+        forecast_periods = get_48h_forecast()
     
     if not forecast_periods:
         raise HTTPException(status_code=503, detail="Could not retrieve forecast data to analyze.")
@@ -206,3 +180,8 @@ def find_best_time_with_savings(
         return { "start_time": best_period["from"], "end_time": end_period["to"], "saved_grams_co2": round(saved_grams) }
     else:
         raise HTTPException(status_code=500, detail="Could not determine the best time.")
+
+# Removed the debug endpoint, as its purpose has been served.
+# @app.get("/api/v1/debug-shortnames")
+# def debug_shortnames_from_api():
+#     ...
