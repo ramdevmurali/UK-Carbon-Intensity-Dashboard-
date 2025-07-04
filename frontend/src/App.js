@@ -1,6 +1,6 @@
 // frontend/src/App.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
@@ -17,40 +17,87 @@ const APPLIANCE_PRESETS = [
 ];
 
 /**
- * A dedicated component to render the THEMED forecast chart
- * with smarter, context-aware labels.
+ * A dedicated component to render the THEMED forecast chart.
+ * It now highlights the current time and the calculated best time window.
  */
-const ForecastChart = ({ forecastData }) => {
+const ForecastChart = ({ forecastData, bestTime, selectedAppliance }) => {
+  // Define our colors
+  const COLOR_DEFAULT = '#607d8b'; // Muted Blue-Grey for better contrast 
+  const COLOR_CURRENT = '#ff9800'; // Orange
+  const COLOR_BEST = '#4caf50';    // Green
+
+  const { bestTimeStartIndex, bestTimeEndIndex } = useMemo(() => {
+    if (!bestTime || bestTime.error || !selectedAppliance || !forecastData.length) {
+      return { bestTimeStartIndex: null, bestTimeEndIndex: null };
+    }
+    
+    // === THIS IS THE CORRECTED LINE ===
+    // Use getTime() for a robust comparison of date-time strings.
+    const startIndex = forecastData.findIndex(
+      d => new Date(d.from).getTime() === new Date(bestTime.start_time).getTime()
+    );
+
+    if (startIndex === -1) {
+      return { bestTimeStartIndex: null, bestTimeEndIndex: null };
+    }
+    const numberOfSlots = selectedAppliance.duration / 30;
+    const endIndex = startIndex + numberOfSlots;
+    return { bestTimeStartIndex: startIndex, bestTimeEndIndex: endIndex };
+  }, [bestTime, selectedAppliance, forecastData]);
+
   if (!forecastData || forecastData.length === 0) return <p>Loading forecast chart...</p>;
 
-  // A variable to keep track of the last day processed.
-  let lastDay = null;
+  const getSegmentColor = (context, isPoint) => {
+    if (!isPoint && !context.p0) {
+      return COLOR_DEFAULT;
+    }
+    const index = isPoint ? context.dataIndex : context.p0.dataIndex;
+
+    // We color the segments that FALL WITHIN the window.
+    // So for a 60-min (2-slot) duration starting at index 10,
+    // we color segments 10 and 11. The condition index < endIndex works perfectly for this.
+    if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index < bestTimeEndIndex) {
+      return COLOR_BEST;
+    }
+
+    if (index === 0) {
+      return COLOR_CURRENT;
+    }
+    return COLOR_DEFAULT;
+  };
+
+  const getPointColor = (context) => {
+    const index = context.dataIndex;
+
+    // For points, we color all points that are part of the window, INCLUDING the end point.
+    // So for a 60-min duration starting at index 10 (endIndex 12), we color points 10, 11, AND 12.
+    if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index <= bestTimeEndIndex) {
+      return COLOR_BEST;
+    }
+    
+    if (index === 0) {
+      return COLOR_CURRENT;
+    }
+
+    return COLOR_DEFAULT;
+  }
 
   const chartData = {
-    // ===============================================
-    // === NEW, SMARTER LABEL GENERATION LOGIC ===
-    // ===============================================
-    labels: forecastData.map(d => {
-      const date = new Date(d.from);
-      const currentDay = date.toDateString(); // Get a string like "Thu Jul 04 2024"
-
-      // Check if the day has changed since the last label.
-      if (currentDay !== lastDay) {
-        lastDay = currentDay;
-        // If it's a new day, return a full, readable date format.
-        return date.toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' });
-      } else {
-        // If it's the same day, just return the time.
-        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      }
-    }),
+    labels: forecastData.map(d => new Date(d.from).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })),
     datasets: [{
       label: 'Carbon Intensity Forecast (gCO₂/kWh)',
       data: forecastData.map(d => d.intensity.forecast),
-      borderColor: '#00bcd4',
-      backgroundColor: 'rgba(0, 188, 212, 0.1)',
       tension: 0.2,
-      pointRadius: 1,
+      borderColor: (context) => getSegmentColor(context, false),
+      pointBackgroundColor: (context) => getPointColor(context),
+      pointRadius: (context) => {
+        const index = context.dataIndex;
+        if (index === 0 || (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index <= bestTimeEndIndex)) {
+            return 3;
+        }
+        return 1;
+      },
+      pointHoverRadius: 5,
     }],
   };
 
@@ -62,19 +109,8 @@ const ForecastChart = ({ forecastData }) => {
       title: { display: true, text: '48-Hour Carbon Intensity Forecast', color: '#f0f0f0' },
     },
     scales: {
-      y: {
-        ticks: { color: '#a9a9a9' },
-        grid: { color: 'rgba(240, 240, 240, 0.1)' }
-      },
-      x: {
-        ticks: {
-          color: '#a9a9a9',
-          // Auto-rotate labels to prevent them from crashing into each other.
-          maxRotation: 45,
-          minRotation: 45,
-        },
-        grid: { color: 'rgba(240, 240, 240, 0.1)' }
-      }
+      y: { beginAtZero: false, ticks: { color: '#a9a9a9' }, grid: { color: 'rgba(240, 240, 240, 0.1)' } },
+      x: { ticks: { color: '#a9a9a9' }, grid: { color: 'rgba(240, 240, 240, 0.1)' } }
     },
   };
 
@@ -84,7 +120,6 @@ const ForecastChart = ({ forecastData }) => {
 
 /**
  * The main application component.
- * No logical changes needed here.
  */
 function App() {
   const [intensityData, setIntensityData] = useState(null);
@@ -94,62 +129,31 @@ function App() {
   const [isLoadingBestTime, setIsLoadingBestTime] = useState(false);
   const [selectedAppliance, setSelectedAppliance] = useState(null);
 
-// frontend/src/App.js
-
-// Find the existing useEffect block and replace it with this one.
-
-useEffect(() => {
-  console.log(`EFFECT SETUP: Component mounted at ${new Date().toLocaleTimeString()}`);
-  let isMounted = true; // A flag to track if the component is still mounted
-
-  const fetchData = async () => {
-    // Don't fetch if the component has been unmounted
-    if (!isMounted) return;
-
-    console.log(`TIMER FIRED: Fetching data at ${new Date().toLocaleTimeString()}`);
-    try {
-      const [currentResponse, forecastResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/intensity/current`),
-        fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
-      ]);
-      
-      // After fetching, check again if the component is still mounted before updating state
-      if (!isMounted) return;
-
-      if (!currentResponse.ok || !forecastResponse.ok) throw new Error('A network response was not ok');
-      
-      const currentData = await currentResponse.json();
-      const forecastArr = await forecastResponse.json();
-      
-      setIntensityData(currentData);
-      setForecastData(forecastArr);
-      setError('');
-    } catch (error) {
-      if (isMounted) {
-        setError('Could not fetch data from the backend.');
-      }
-    }
-  };
-
-  // Initial fetch
-  fetchData();
-
-  // Set up the interval
-  const intervalId = setInterval(fetchData, 180000);
-  console.log(`EFFECT SETUP: Interval with ID ${intervalId} has been set.`);
-
-  // Return the cleanup function
-  return () => {
-    console.log(`EFFECT CLEANUP: Component unmounting, clearing interval ID ${intervalId}`);
-    isMounted = false; // Set the flag to false
-    clearInterval(intervalId);
-  };
-}, []); // The empty array is still correct, it should only run on mount
+  useEffect(() => {
+    const initialFetch = async () => {
+        try {
+            const [currentResponse, forecastResponse] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/v1/intensity/current`),
+                fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
+            ]);
+            if (!currentResponse.ok || !forecastResponse.ok) throw new Error('Network response was not ok');
+            const currentData = await currentResponse.json();
+            const forecastArr = await forecastResponse.json();
+            setIntensityData(currentData); setForecastData(forecastArr); setError('');
+        } catch (error) {
+            setError('Could not fetch initial data from the backend.');
+        }
+    };
+    initialFetch();
+    const intervalId = setInterval(initialFetch, 180000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handlePresetClick = async (appliance) => {
     setSelectedAppliance(appliance);
     setIsLoadingBestTime(true);
     setBestTime(null);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/optimizer/best-time?duration_minutes=${appliance.duration}&power_kw=${appliance.power_kw}`);
       if (!response.ok) {
@@ -201,6 +205,7 @@ useEffect(() => {
             </button>
           ))}
         </div>
+
         {bestTime && (
           <div className="optimizer-result">
             {bestTime.error ? (
@@ -221,7 +226,11 @@ useEffect(() => {
       </div>
 
       <div className="chart-container">
-        <ForecastChart forecastData={forecastData} />
+        <ForecastChart 
+          forecastData={forecastData} 
+          bestTime={bestTime} 
+          selectedAppliance={selectedAppliance} 
+        />
       </div>
     </div>
   );

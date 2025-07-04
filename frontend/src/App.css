@@ -156,3 +156,90 @@ body {
 .error-text {
   color: #ff9a9a;
 }
+/* Add or replace these rules in frontend/src/App.css */
+
+/* --- Main Display --- */
+
+.hero-value {
+  /* CHANGED: Switched from blue to a clean off-white for better readability. */
+  color: #E0E0E0; 
+  font-size: 6rem;
+  font-weight: 500;
+  line-height: 1.1;
+  margin: 10px 0 0;
+}
+
+.hero-unit {
+  color: #a9a9a9;
+  font-size: 1.2rem;
+  margin-top: -10px;
+}
+
+.intensity-badge {
+  margin-top: 15px;
+  padding: 8px 25px;
+  border-radius: 20px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+}
+
+
+/* --- Optimizer Buttons & Result --- */
+
+.optimizer-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.preset-button {
+  background-color: transparent;
+  border: 1px solid #757575;
+  color: #E0E0E0;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  font-size: 1rem;
+}
+
+.preset-button:hover:not(:disabled) {
+  border-color: #f0f0f0;
+  color: #f0f0f0;
+}
+
+.preset-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* CHANGED: The active button now uses our "best" green for a consistent theme. */
+.preset-button.active {
+  background-color: #4caf50; 
+  border-color: #4caf50;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.optimizer-result {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 20px;
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+.result-time {
+  /* CHANGED: Switched from blue to the same off-white as the hero number. */
+  color: #E0E0E0;
+  font-size: 3rem;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.result-savings {
+  color: #bdbdbd;
+}
