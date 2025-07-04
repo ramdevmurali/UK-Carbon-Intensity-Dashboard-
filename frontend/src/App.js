@@ -16,27 +16,18 @@ const APPLIANCE_PRESETS = [
   { name: 'EV Charge (4h)', duration: 240, power_kw: 7.0 },
 ];
 
-/**
- * A dedicated component to render the THEMED forecast chart.
- * It now highlights the current time and the calculated best time window.
- */
 const ForecastChart = ({ forecastData, bestTime, selectedAppliance }) => {
-  // Define our colors
-  const COLOR_DEFAULT = '#607d8b'; // Muted Blue-Grey for better contrast 
-  const COLOR_CURRENT = '#ff9800'; // Orange
-  const COLOR_BEST = '#4caf50';    // Green
+  const COLOR_DEFAULT = '#607d8b';
+  const COLOR_CURRENT = '#ff9800';
+  const COLOR_BEST = '#4caf50';
 
   const { bestTimeStartIndex, bestTimeEndIndex } = useMemo(() => {
     if (!bestTime || bestTime.error || !selectedAppliance || !forecastData.length) {
       return { bestTimeStartIndex: null, bestTimeEndIndex: null };
     }
-    
-    // === THIS IS THE CORRECTED LINE ===
-    // Use getTime() for a robust comparison of date-time strings.
     const startIndex = forecastData.findIndex(
       d => new Date(d.from).getTime() === new Date(bestTime.start_time).getTime()
     );
-
     if (startIndex === -1) {
       return { bestTimeStartIndex: null, bestTimeEndIndex: null };
     }
@@ -48,37 +39,21 @@ const ForecastChart = ({ forecastData, bestTime, selectedAppliance }) => {
   if (!forecastData || forecastData.length === 0) return <p>Loading forecast chart...</p>;
 
   const getSegmentColor = (context, isPoint) => {
-    if (!isPoint && !context.p0) {
-      return COLOR_DEFAULT;
-    }
+    if (!isPoint && !context.p0) return COLOR_DEFAULT;
     const index = isPoint ? context.dataIndex : context.p0.dataIndex;
-
-    // We color the segments that FALL WITHIN the window.
-    // So for a 60-min (2-slot) duration starting at index 10,
-    // we color segments 10 and 11. The condition index < endIndex works perfectly for this.
     if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index < bestTimeEndIndex) {
       return COLOR_BEST;
     }
-
-    if (index === 0) {
-      return COLOR_CURRENT;
-    }
+    if (index === 0) return COLOR_CURRENT;
     return COLOR_DEFAULT;
   };
 
   const getPointColor = (context) => {
     const index = context.dataIndex;
-
-    // For points, we color all points that are part of the window, INCLUDING the end point.
-    // So for a 60-min duration starting at index 10 (endIndex 12), we color points 10, 11, AND 12.
     if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index <= bestTimeEndIndex) {
       return COLOR_BEST;
     }
-    
-    if (index === 0) {
-      return COLOR_CURRENT;
-    }
-
+    if (index === 0) return COLOR_CURRENT;
     return COLOR_DEFAULT;
   }
 
@@ -117,10 +92,6 @@ const ForecastChart = ({ forecastData, bestTime, selectedAppliance }) => {
   return <div style={{ height: '400px' }}><Line options={options} data={chartData} /></div>;
 };
 
-
-/**
- * The main application component.
- */
 function App() {
   const [intensityData, setIntensityData] = useState(null);
   const [forecastData, setForecastData] = useState([]);
@@ -129,6 +100,7 @@ function App() {
   const [isLoadingBestTime, setIsLoadingBestTime] = useState(false);
   const [selectedAppliance, setSelectedAppliance] = useState(null);
 
+  // --- MODIFICATION 1/2: Reverting useEffect to the clean, original version ---
   useEffect(() => {
     const initialFetch = async () => {
         try {
@@ -153,7 +125,6 @@ function App() {
     setSelectedAppliance(appliance);
     setIsLoadingBestTime(true);
     setBestTime(null);
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/optimizer/best-time?duration_minutes=${appliance.duration}&power_kw=${appliance.power_kw}`);
       if (!response.ok) {
@@ -179,7 +150,8 @@ function App() {
   return (
     <div className="App">
       <div className="section-box">
-        {intensityData ? (
+        {/* --- MODIFICATION 2/2: Adding a defensive check for intensityData.intensity --- */}
+        {intensityData && intensityData.intensity ? (
           <>
             <h2>Current UK Carbon Intensity</h2>
             <div className="hero-value">{intensityData.intensity.actual || 'N/A'}</div>
@@ -205,7 +177,6 @@ function App() {
             </button>
           ))}
         </div>
-
         {bestTime && (
           <div className="optimizer-result">
             {bestTime.error ? (
