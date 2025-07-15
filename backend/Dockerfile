@@ -1,23 +1,23 @@
 # backend/Dockerfile
 
-# Use a version of Python that supports modern type hinting (3.10+)
 FROM python:3.11-slim
 
-# Install curl, which can be useful for debugging inside the container
 RUN apt-get update && apt-get install -y curl
 
-# Set the working directory in the container
+# Set the working directory. This will be the root for our python path.
 WORKDIR /app
 
-# Copy and install the dependencies
+# Copy requirements FIRST, to leverage Docker caching.
+# Note: We copy it into the WORKDIR, not a subdirectory yet.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application's code
-COPY . .
+# Now, copy the application code into a 'backend' subdirectory.
+# This creates the structure /app/backend/main.py
+COPY . ./backend/
 
-# Expose the port the app runs on
+# Expose the port
 EXPOSE 8001
 
-# Define the command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# This command works because the WORKDIR is /app and it can find the 'backend' module within it.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
