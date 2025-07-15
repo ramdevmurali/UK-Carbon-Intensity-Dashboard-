@@ -3,9 +3,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './App.css';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+// --- NEW COMPONENT IMPORT ---
+import GenerationMixChart from './GenerationMixChart';
+
+// --- REGISTER ArcElement for Doughnut Chart ---
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
 const API_BASE_URL = 'http://localhost:8001';
 
@@ -16,11 +20,9 @@ const APPLIANCE_PRESETS = [
   { name: 'EV Charge (4h)', duration: 240, power_kw: 7.0 },
 ];
 
-/**
- * A dedicated component to render the THEMED forecast chart.
- * It now highlights the current time and the calculated best time window.
- */
+
 const ForecastChart = ({ forecastData, bestTime, selectedAppliance, currentRegionName }) => {
+  // (This component has no changes)
   const COLOR_DEFAULT = '#607d8b';
   const COLOR_CURRENT = '#ff9800';
   const COLOR_BEST = '#4caf50';
@@ -97,46 +99,46 @@ const ForecastChart = ({ forecastData, bestTime, selectedAppliance, currentRegio
 };
 
 
-/**
- * The main application component.
- */
 function App() {
-  const [intensityData, setIntensityData] = useState(null); // Current (National)
-  const [forecastData, setForecastData] = useState([]); // Forecast (National)
-  const [error, setError] = useState(''); // General error for national data fetch
+  const [intensityData, setIntensityData] = useState(null);
+  const [forecastData, setForecastData] = useState([]);
+  const [nationalGenerationMix, setNationalGenerationMix] = useState(null); // --- NEW STATE ---
+  const [error, setError] = useState('');
+
   const [bestTime, setBestTime] = useState(null);
   const [isLoadingBestTime, setIsLoadingBestTime] = useState(false);
   const [selectedAppliance, setSelectedAppliance] = useState(null);
 
   const [regions, setRegions] = useState([]);
-  const [selectedRegion, setSelectedRegion] = useState('National'); // Default to 'National'
-  const [regionalIntensityData, setRegionalIntensityData] = useState(null); // For selected region's current data
-  const [regionalForecastData, setRegionalForecastData] = useState([]); // For selected region's forecast data
+  const [selectedRegion, setSelectedRegion] = useState('National');
+  const [regionalIntensityData, setRegionalIntensityData] = useState(null);
+  const [regionalForecastData, setRegionalForecastData] = useState([]);
+  const [regionalGenerationMix, setRegionalGenerationMix] = useState(null); // --- NEW STATE ---
   const [isLoadingRegionData, setIsLoadingRegionData] = useState(false);
-  const [regionError, setRegionError] = useState(''); // Specific error for regional data fetch
+  const [regionError, setRegionError] = useState('');
 
 
-  // --- Unified Data Fetching Function ---
+  // --- MODIFIED: Unified Data Fetching Function ---
   const fetchData = useCallback(async (regionToFetch = 'National') => {
-    let currentData = null;
-    let forecastArr = [];
-    let currentError = '';
+    let currentData, forecastArr, generationMix = null, currentError = '';
 
     try {
       if (regionToFetch === 'National') {
-        // Fetch National data
-        const [currentNationalResponse, forecastNationalResponse] = await Promise.all([
+        const [currentRes, forecastRes, genMixRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/v1/intensity/current`),
-          fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`)
+          fetch(`${API_BASE_URL}/api/v1/intensity/forecast/48h`),
+          fetch(`${API_BASE_URL}/api/v1/generation/current`) // --- NEW FETCH ---
         ]);
 
-        if (!currentNationalResponse.ok || !forecastNationalResponse.ok) {
+        if (!currentRes.ok || !forecastRes.ok || !genMixRes.ok) {
           throw new Error('Network response for national data was not ok');
         }
-        currentData = await currentNationalResponse.json();
-        forecastArr = await forecastNationalResponse.json();
+        currentData = await currentRes.json();
+        forecastArr = await forecastRes.json();
+        const genMixData = await genMixRes.json(); // --- NEW ---
+        generationMix = genMixData.generationmix; // --- NEW ---
+
       } else {
-        // Fetch Regional data
         setIsLoadingRegionData(true);
         const [currentRegionalResponse, forecastRegionalResponse] = await Promise.all([
           fetch(`${API_BASE_URL}/api/v1/intensity/regional/current/${encodeURIComponent(regionToFetch)}`),
@@ -144,80 +146,78 @@ function App() {
         ]);
 
         if (!currentRegionalResponse.ok || !forecastRegionalResponse.ok) {
-          const currentErrorData = await currentRegionalResponse.json().catch(() => ({ detail: 'Unknown error.' }));
-          const forecastErrorData = await forecastRegionalResponse.json().catch(() => ({ detail: 'Unknown error.' }));
-          const errorMessage = currentErrorData.detail || forecastErrorData.detail || `Could not fetch data for ${regionToFetch}.`;
-          throw new Error(errorMessage);
+          throw new Error(`Could not fetch data for ${regionToFetch}.`);
         }
         currentData = await currentRegionalResponse.json();
         forecastArr = await forecastRegionalResponse.json();
+        // --- Regional generation mix is already included in the 'current' response! ---
+        generationMix = currentData.generationmix; 
         setIsLoadingRegionData(false);
       }
-      return { currentData, forecastArr, error: null };
+      return { currentData, forecastArr, generationMix, error: null };
     } catch (err) {
       currentError = err.message || 'An unexpected error occurred during data fetch.';
       console.error(`Failed to fetch data for ${regionToFetch}:`, err);
-      return { currentData: null, forecastArr: [], error: currentError };
+      return { currentData: null, forecastArr: [], generationMix: null, error: currentError };
     }
   }, []);
 
 
-  // --- EFFECT HOOK 1: Initial Fetch for Regions and National Data ---
+  // --- MODIFIED: Initial Fetch and Interval Logic ---
   useEffect(() => {
     const initialLoad = async () => {
-      // Fetch available regions only once
       try {
         const regionsResponse = await fetch(`${API_BASE_URL}/api/v1/regions`);
-        if (!regionsResponse.ok) {
-          throw new Error('Network response for regions was not ok');
-        }
+        if (!regionsResponse.ok) throw new Error('Could not fetch regions');
         const regionsData = await regionsResponse.json();
         setRegions(['National', ...regionsData.regions]);
       } catch (err) {
-        console.error("Failed to fetch available regions:", err);
-        setError('Could not fetch available regions from the backend.');
+        setError('Could not fetch available regions.');
       }
 
-      // Fetch initial National data
-      const { currentData, forecastArr, error: initialError } = await fetchData('National');
+      const { currentData, forecastArr, generationMix, error: initialError } = await fetchData('National');
       setIntensityData(currentData);
       setForecastData(forecastArr);
+      setNationalGenerationMix(generationMix); // --- NEW ---
       setError(initialError || '');
     };
 
     initialLoad();
 
-    // Set up interval for data refresh (based on currently selected region)
     const intervalId = setInterval(async () => {
-        const { currentData, forecastArr, error: periodicError } = await fetchData(selectedRegion);
+        const { currentData, forecastArr, generationMix, error: periodicError } = await fetchData(selectedRegion);
         if (selectedRegion === 'National') {
             setIntensityData(currentData);
             setForecastData(forecastArr);
+            setNationalGenerationMix(generationMix); // --- NEW ---
             setError(periodicError || '');
         } else {
             setRegionalIntensityData(currentData);
             setRegionalForecastData(forecastArr.data || []);
+            setRegionalGenerationMix(generationMix); // --- NEW ---
             setRegionError(periodicError || '');
         }
-    }, 180000);
+    }, 180000); // 3 minutes
 
     return () => clearInterval(intervalId);
-  }, [fetchData, selectedRegion]);
+  }, [fetchData, selectedRegion]); // selectedRegion dependency is key for interval refresh
 
 
-  // --- EFFECT HOOK 2: Update Data Display based on selectedRegion ---
+  // --- MODIFIED: Update Data on Region Change ---
   useEffect(() => {
     const updateDisplay = async () => {
-        setBestTime(null); // Clear optimizer result on region change
-
+        setBestTime(null);
         if (selectedRegion === 'National') {
             setRegionalIntensityData(null); 
             setRegionalForecastData([]);
+            setRegionalGenerationMix(null); // --- NEW ---
             setRegionError('');
         } else {
-            const { currentData, forecastArr, error: regionalFetchError } = await fetchData(selectedRegion);
+            // Fetch new regional data immediately on change
+            const { currentData, forecastArr, generationMix, error: regionalFetchError } = await fetchData(selectedRegion);
             setRegionalIntensityData(currentData);
             setRegionalForecastData(forecastArr.data || []);
+            setRegionalGenerationMix(generationMix); // --- NEW ---
             setRegionError(regionalFetchError || '');
         }
     };
@@ -225,43 +225,23 @@ function App() {
   }, [selectedRegion, fetchData]);
 
 
-  // --- MODIFIED handlePresetClick with debug logging for 422 ---
+  // handlePresetClick (no changes needed)
   const handlePresetClick = async (appliance) => {
     setSelectedAppliance(appliance);
     setIsLoadingBestTime(true);
     setBestTime(null);
-
     try {
-      // Use URLSearchParams for clean and correct query string construction
       const params = new URLSearchParams();
-      params.append('duration_minutes', appliance.duration.toString()); // Convert to string for URL param
-      params.append('power_kw', appliance.power_kw.toString()); // Convert to string for URL param
-
+      params.append('duration_minutes', appliance.duration.toString());
+      params.append('power_kw', appliance.power_kw.toString());
       if (selectedRegion !== 'National') {
-        params.append('region_shortname', selectedRegion); // URLSearchParams handles encoding
+        params.append('region_shortname', selectedRegion);
       }
-
       const optimizerUrl = `${API_BASE_URL}/api/v1/optimizer/best-time?${params.toString()}`;
-
-      console.log("Optimizer API Call URL (using URLSearchParams):", optimizerUrl); // This log will now show a clean URL
-
       const response = await fetch(optimizerUrl);
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'An unknown error occurred parsing error response.' }));
-        console.error("Backend optimizer error response (likely 422 validation error):", errorData);
-        
-        let errorMessage = 'An unexpected error occurred.';
-        if (errorData && Array.isArray(errorData.detail) && errorData.detail.length > 0) {
-            errorMessage = errorData.detail.map(err => {
-                // This enhanced message parsing will provide more detail from FastAPI validation errors
-                const field = err.loc && err.loc.length > 1 ? err.loc[1] : 'unknown field';
-                return `Field '${field}': ${err.msg}`;
-            }).join('; ');
-        } else if (errorData && errorData.detail) {
-            errorMessage = errorData.detail;
-        }
-
-        throw new Error(errorMessage);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'An unexpected error occurred.');
       }
       const data = await response.json();
       setBestTime(data);
@@ -279,9 +259,10 @@ function App() {
     }
   };
 
-  // --- Determine which data to display based on selectedRegion ---
+  // --- MODIFIED: Determine which data to display ---
   const displayIntensityData = selectedRegion === 'National' ? intensityData : regionalIntensityData;
   const displayForecastData = selectedRegion === 'National' ? forecastData : regionalForecastData;
+  const displayGenerationMix = selectedRegion === 'National' ? nationalGenerationMix : regionalGenerationMix;
   const displayRegionName = selectedRegion === 'National' ? 'UK' : selectedRegion;
 
 
@@ -291,46 +272,44 @@ function App() {
         <h2>Carbon Intensity ({displayRegionName})</h2>
         <div className="region-selector-controls">
           <label htmlFor="region-select">Select Region:</label>
-          <select
-            id="region-select"
-            value={selectedRegion}
-            onChange={(e) => setSelectedRegion(e.target.value)}
-            disabled={isLoadingRegionData}
-            className="region-dropdown"
-          >
-            {regions.map(region => (
-              <option key={region} value={region}>{region}</option>
-            ))}
+          <select id="region-select" value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value)} disabled={isLoadingRegionData} className="region-dropdown">
+            {regions.map(region => <option key={region} value={region}>{region}</option>)}
           </select>
           {isLoadingRegionData && <p>Loading region data...</p>}
           {regionError && <p className="error-text">{regionError}</p>}
         </div>
       </div>
 
-      <div className="section-box">
-        {displayIntensityData && displayIntensityData.intensity ? (
-          <>
-            <h2>Current {displayRegionName} Carbon Intensity</h2>
-            {/* Display actual if available, otherwise fallback to forecast */}
-            <div className="hero-value">{displayIntensityData.intensity.actual || displayIntensityData.intensity.forecast || 'N/A'}</div> 
-            <div className="hero-unit">gCO₂/kWh</div>
-            <div className="intensity-badge" style={{ backgroundColor: getIndexColor(displayIntensityData.intensity.index) }}>
-              {displayIntensityData.intensity.index}
-            </div>
-          </>
-        ) : !error && !regionError ? <p>Loading current intensity...</p> : <p className="error-text">{error || regionError}</p>}
+      {/* --- NEW LAYOUT for top row --- */}
+      <div className="top-row-container">
+        <div className="section-box intensity-box">
+          {displayIntensityData && displayIntensityData.intensity ? (
+            <>
+              <h2>Current Intensity</h2>
+              <div className="hero-value">{displayIntensityData.intensity.actual || displayIntensityData.intensity.forecast || 'N/A'}</div> 
+              <div className="hero-unit">gCO₂/kWh</div>
+              <div className="intensity-badge" style={{ backgroundColor: getIndexColor(displayIntensityData.intensity.index) }}>
+                {displayIntensityData.intensity.index}
+              </div>
+            </>
+          ) : !error && !regionError ? <p>Loading current intensity...</p> : <p className="error-text">{error || regionError}</p>}
+        </div>
+        
+        {/* --- NEW Generation Mix Chart Section --- */}
+        <div className="section-box generation-mix-box">
+           <GenerationMixChart 
+              generationMixData={displayGenerationMix}
+              regionName={displayRegionName}
+            />
+        </div>
       </div>
+
 
       <div className="section-box">
         <h3>Find the Greenest Time for...</h3>
         <div className="optimizer-presets">
           {APPLIANCE_PRESETS.map((appliance) => (
-            <button
-              key={appliance.name}
-              className={`preset-button ${selectedAppliance?.name === appliance.name ? 'active' : ''}`}
-              onClick={() => handlePresetClick(appliance)}
-              disabled={isLoadingBestTime || isLoadingRegionData}
-            >
+            <button key={appliance.name} className={`preset-button ${selectedAppliance?.name === appliance.name ? 'active' : ''}`} onClick={() => handlePresetClick(appliance)} disabled={isLoadingBestTime || isLoadingRegionData}>
               {isLoadingBestTime && selectedAppliance?.name === appliance.name ? 'Calculating...' : appliance.name}
             </button>
           ))}
@@ -338,17 +317,11 @@ function App() {
 
         {bestTime && (
           <div className="optimizer-result">
-            {bestTime.error ? (
-              <p className="error-text">Error: {bestTime.error}</p>
-            ) : (
+            {bestTime.error ? <p className="error-text">Error: {bestTime.error}</p> : (
               <>
                 <p>The best time for your <strong>{selectedAppliance.name}</strong> starts at:</p>
-                <div className="result-time">
-                  {new Date(bestTime.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })}
-                </div>
-                <p className="result-savings">
-                  Estimated saving: <strong>{bestTime.saved_grams_co2.toLocaleString()}g of CO₂</strong>
-                </p>
+                <div className="result-time">{new Date(bestTime.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })}</div>
+                <p className="result-savings">Estimated saving: <strong>{bestTime.saved_grams_co2.toLocaleString()}g of CO₂</strong></p>
               </>
             )}
           </div>
@@ -356,12 +329,7 @@ function App() {
       </div>
 
       <div className="chart-container">
-        <ForecastChart 
-          forecastData={displayForecastData} 
-          bestTime={bestTime} 
-          selectedAppliance={selectedAppliance}
-          currentRegionName={displayRegionName}
-        />
+        <ForecastChart forecastData={displayForecastData} bestTime={bestTime} selectedAppliance={selectedAppliance} currentRegionName={displayRegionName} />
       </div>
     </div>
   );

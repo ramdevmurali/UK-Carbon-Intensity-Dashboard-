@@ -13,7 +13,7 @@ API_BASE_URL = "https://api.carbonintensity.org.uk"
 app = FastAPI(
     title="UK Carbon Intensity API",
     description="A proxy API for the UK National Grid Carbon Intensity data.",
-    version="2.4.1", # The "Region Name Corrected" version
+    version="2.5.0", # Version with Generation Mix
 )
 origins = ["*"]
 app.add_middleware(
@@ -33,13 +33,13 @@ CANONICAL_REGION_SHORTNAMES = sorted([
     "South East England",
     "South Scotland",
     "South Wales",
-    "South West England", # CORRECTED: Removed 'ern'
+    "South West England",
     "West Midlands",
     "Yorkshire"
 ])
 
 
-# --- Helper Functions (Identical to previous working version) ---
+# --- Helper Functions (No changes) ---
 def fetch_from_api(url: str):
     try:
         logger.info(f"Fetching data from external URL: {url}")
@@ -59,7 +59,7 @@ def fetch_from_api(url: str):
         raise HTTPException(status_code=500, detail="An unexpected internal error occurred.")
 
 
-# --- get_regional_forecast function (Identical to previous working version) ---
+# --- get_regional_forecast function (No changes) ---
 def get_regional_forecast(region_shortname: str): 
     now_utc = datetime.now(timezone.utc)
     minutes_past_half_hour = now_utc.minute % 30
@@ -111,6 +111,14 @@ def read_root(): return {"status": "ok", "message": "API is stable and correct."
 def get_available_regions():
     return {"regions": CANONICAL_REGION_SHORTNAMES}
 
+# *** NEW ENDPOINT FOR NATIONAL GENERATION MIX ***
+@app.get("/api/v1/generation/current")
+def get_current_generation_mix():
+    data = fetch_from_api(f"{API_BASE_URL}/generation")
+    # The API returns {"data": {"from": "...", "to": "...", "generationmix": [...]}}
+    # We return the content of the "data" key.
+    return data.get('data', {})
+
 @app.get("/api/v1/intensity/current")
 def get_current_intensity():
     data = fetch_from_api(f"{API_BASE_URL}/intensity")
@@ -135,7 +143,7 @@ def get_current_regional_intensity_by_name(region_shortname: str):
         "from": first_period.get('from'),
         "to": first_period.get('to'),
         "intensity": first_period.get('intensity'),
-        "generationmix": first_period.get('generationmix'),
+        "generationmix": first_period.get('generationmix'), # This is already here! Perfect.
     }
 
 @app.get("/api/v1/intensity/regional/forecast/48h/{region_shortname}")
@@ -148,6 +156,7 @@ def find_best_time_with_savings(
     power_kw: float = Query(..., gt=0),
     region_shortname: str | None = None 
 ):
+    # This endpoint does not need to change
     forecast_periods = []
     if region_shortname:
         regional_forecast_container = get_regional_forecast(region_shortname=region_shortname)
@@ -180,8 +189,3 @@ def find_best_time_with_savings(
         return { "start_time": best_period["from"], "end_time": end_period["to"], "saved_grams_co2": round(saved_grams) }
     else:
         raise HTTPException(status_code=500, detail="Could not determine the best time.")
-
-# Removed the debug endpoint, as its purpose has been served.
-# @app.get("/api/v1/debug-shortnames")
-# def debug_shortnames_from_api():
-#     ...
