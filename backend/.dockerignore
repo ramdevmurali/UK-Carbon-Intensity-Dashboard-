@@ -1,10 +1,15 @@
-# Ignore IDE and Python cache files
+# Python virtual environments (local) - these should NEVER be copied
+.venv/
+venv/
+
+# Python bytecode - generated dynamically
 __pycache__/
 *.pyc
 
-# Ignore virtual environment
-.venv/
-
-# Ignore development notebooks and large data files from the image
+# Development notebooks and generated data - not needed in production image
 notebooks/
 data/
+
+# Specific artifacts that shouldn't be copied
+*.sqlite3
+.DS_Store

@@ -15,18 +15,38 @@
     font-size: 1.5rem;
   }
   .recommenderGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
     gap: 20px;
+    overflow-x: auto;
+    padding-bottom: 20px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    
+    /* --- NEW: Scroll Snap Container Properties --- */
+    scroll-snap-type: x mandatory; /* Snap horizontally, mandatory snapping */
+    -webkit-overflow-scrolling: touch; /* Enhance touch scrolling on iOS */
+  }
+  .recommenderGrid::-webkit-scrollbar {
+    display: none;
+  }
+  .recommenderGrid::-webkit-scrollbar {
+    display: none;
   }
   .recommendationCard {
-    /* A slightly lighter shade of dark for the inner cards */
     background-color: #4a5568; 
     border: 1px solid #718096;
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border-left: 5px solid #4a5568; 
+    
+    width: 300px;
+    flex-shrink: 0;
+    
+    /* --- NEW: Scroll Snap Item Property --- */
+    scroll-snap-align: start; /* Snap to the start of each card */
   }
   .recommendationCard:hover {
     transform: translateY(-5px);
