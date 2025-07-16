@@ -61,24 +61,29 @@ kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
 kmeans.fit(scaled_features)
 
 print("K-Means model and StandardScaler have been trained.")
-
 # --- 5. Define Cluster Mapping ---
 # This map is based on manual analysis from the notebook
 cluster_to_appliance_map = {
     0: {
         "name": "Heavy Load Shift",
         "reason": "This is a long, stable, and very low-carbon period. Ideal for high-consumption tasks.",
-        "appliance": "EV Charger / Washing Machine"
+        "appliance": "EV Charger / Washing Machine",
+        "color": "#4299E1", # Blue
+        "icon": "FaBolt"
     },
     1: {
         "name": "Standard Green Window",
         "reason": "A moderately long and low-carbon window. Good for everyday appliances.",
-        "appliance": "Dishwasher / Tumble Dryer"
+        "appliance": "Dishwasher / Tumble Dryer",
+        "color": "#48BB78", # Green
+        "icon": "FaCogs"
     },
     2: {
         "name": "Quick Green Burst",
         "reason": "A short but significantly green window. Perfect for quick, opportunistic tasks.",
-        "appliance": "Kettle / Toaster / Quick Charge"
+        "appliance": "Kettle / Toaster / Quick Charge",
+        "color": "#4FD1C5", # Teal
+        "icon": "FaLeaf"
     }
 }
 print("Defined cluster-to-appliance mapping.")

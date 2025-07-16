@@ -3,14 +3,7 @@
  * This version is styled to match the application's dark theme.
  */
 
- .recommenderContainer {
-    /* Match the dark card style from the rest of the app */
-    background-color: #2d3748; 
-    border-radius: 8px;
-    padding: 24px;
-    margin-top: 2rem;
-    color: #f7fafc; /* Set default text color to light */
-  }
+ 
   .recommenderHeader {
     display: flex;
     align-items: center;
@@ -95,4 +88,10 @@
     transform: translateY(-5px);
     border-color: #63b3ed; /* A nice blue highlight color */
     box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.4);
+  }
+  .iconWrapper {
+    font-size: 1.5rem;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
   }

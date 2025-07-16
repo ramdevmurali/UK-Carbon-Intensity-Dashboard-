@@ -11,7 +11,6 @@ import ForecastChart from './components/ForecastChart';
 import RegionSelector from './components/RegionSelector';
 import SmartRecommendations from './components/SmartRecommendations';
 
-// Register ChartJS elements.
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
 function App() {
@@ -43,16 +42,17 @@ function App() {
         </div>
       </div>
 
-      {/* Pass the new props to SmartRecommendations */}
-      <SmartRecommendations
-        recommendations={data.applianceRecommendations}
-        isLoading={state.isLoadingRecommendations}
-        onWindowSelect={actions.setSelectedWindow}
-        selectedWindow={data.selectedWindow}
-      />
+      {/* 1. WRAP the component in the global 'section-box' class */}
+      <div className="section-box">
+        <SmartRecommendations
+          recommendations={data.applianceRecommendations}
+          isLoading={state.isLoadingRecommendations}
+          onWindowSelect={actions.setSelectedWindow}
+          selectedWindow={data.selectedWindow}
+        />
+      </div>
 
       <div className="chart-container">
-        {/* Pass the selected window down to the ForecastChart */}
         <ForecastChart
           forecastData={data.displayForecastData}
           currentRegionName={data.displayRegionName}
