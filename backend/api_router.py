@@ -51,6 +51,20 @@ def get_regional_48h_forecast_endpoint_by_name(region_shortname: str):
     """Endpoint for a region's 48-hour forecast."""
     return services.get_regional_forecast_48h(region_shortname)
 
+# --- NEW ENDPOINT FOR SMART RECOMMENDATIONS ---
+@router.get("/optimizer/appliance-recommendations")
+def get_appliance_recommendations_endpoint(
+    region_shortname: str | None = Query(default=None, description="Canonical region shortname, e.g., 'London'. If omitted, provides national recommendations.")
+):
+    """
+    Endpoint for the 'Smart Recommender'. Analyzes the 48-hour forecast
+    and returns personalized appliance usage recommendations based on the
+    character of low-carbon windows.
+    """
+    return services.get_appliance_recommendations(region_shortname=region_shortname)
+
+
+# --- OLD OPTIMIZER ENDPOINT (KEPT FOR REFERENCE) ---
 @router.get("/optimizer/best-time")
 def find_best_time_endpoint(
     duration_minutes: int = Query(..., gt=0),
