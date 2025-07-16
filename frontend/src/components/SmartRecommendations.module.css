@@ -88,3 +88,11 @@
     color: #a0aec0; /* Light gray, easily readable on dark background */
     font-size: 1.1rem;
   }
+  /* ... (all existing styles above) ... */
+
+/* NEW: Style for the active/selected card */
+.recommendationCard.active {
+    transform: translateY(-5px);
+    border-color: #63b3ed; /* A nice blue highlight color */
+    box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.4);
+  }

@@ -3,28 +3,66 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 
-// Note: ChartJS is already registered in App.js, so we don't need to do it again here.
-// We only need the specific chart elements we're using.
+// --- NEW: Chart.js Plugin for highlighting the selected window ---
+// This plugin will draw a shaded rectangle on the chart background.
+const selectionHighlighter = {
+  id: 'selectionHighlighter',
+  // We draw 'before' the datasets so the highlight is behind the line
+  beforeDraw: (chart, args, options) => {
+    const { highlightStartIndex, highlightEndIndex } = options;
 
-const ForecastChart = ({ forecastData, bestTime, selectedAppliance, currentRegionName }) => {
-  const COLOR_DEFAULT = '#607d8b';
-  const COLOR_CURRENT = '#ff9800';
-  const COLOR_BEST = '#4caf50';
-
-  const { bestTimeStartIndex, bestTimeEndIndex } = useMemo(() => {
-    if (!bestTime || bestTime.error || !selectedAppliance || !forecastData.length) {
-      return { bestTimeStartIndex: null, bestTimeEndIndex: null };
+    // If no window is selected, do nothing
+    if (highlightStartIndex === null || highlightEndIndex === null) {
+      return;
     }
+
+    const { ctx, chartArea: { top, bottom }, scales: { x, y } } = chart;
+    ctx.save();
+
+    // Get the pixel coordinates for the start and end of the selection
+    const startX = x.getPixelForValue(highlightStartIndex);
+    const endX = x.getPixelForValue(highlightEndIndex);
+    
+    // Set the style for the highlight rectangle
+    ctx.fillStyle = 'rgba(99, 179, 237, 0.2)'; // A semi-transparent blue
+    ctx.strokeStyle = 'rgba(99, 179, 237, 0.6)';
+    ctx.lineWidth = 1;
+
+    // Draw the rectangle
+    ctx.fillRect(startX, top, endX - startX, bottom - top);
+    ctx.strokeRect(startX, top, endX - startX, bottom - top);
+
+    ctx.restore();
+  }
+};
+
+
+const ForecastChart = ({ forecastData, currentRegionName, selectedWindow }) => {
+  
+  // 1. COMPLETELY REPLACED LOGIC
+  // This memo now finds the start and end indices of the *selectedWindow*.
+  const { highlightStartIndex, highlightEndIndex } = useMemo(() => {
+    // If no window is selected or no data, return nulls
+    if (!selectedWindow || !forecastData.length) {
+      return { highlightStartIndex: null, highlightEndIndex: null };
+    }
+
+    // Find the array index that matches the start and end times of the selected window
     const startIndex = forecastData.findIndex(
-      d => new Date(d.from).getTime() === new Date(bestTime.start_time).getTime()
+      d => new Date(d.from).getTime() === new Date(selectedWindow.startTime).getTime()
     );
-    if (startIndex === -1) {
-      return { bestTimeStartIndex: null, bestTimeEndIndex: null };
+    const endIndex = forecastData.findIndex(
+      d => new Date(d.to).getTime() === new Date(selectedWindow.endTime).getTime()
+    );
+
+    // If either isn't found, something is wrong, so don't highlight
+    if (startIndex === -1 || endIndex === -1) {
+      return { highlightStartIndex: null, highlightEndIndex: null };
     }
-    const numberOfSlots = selectedAppliance.duration / 30;
-    const endIndex = startIndex + numberOfSlots;
-    return { bestTimeStartIndex: startIndex, bestTimeEndIndex: endIndex };
-  }, [bestTime, selectedAppliance, forecastData]);
+
+    return { highlightStartIndex: startIndex, highlightEndIndex: endIndex };
+  }, [selectedWindow, forecastData]);
+
 
   if (!forecastData || forecastData.length === 0) {
     return (
@@ -34,40 +72,16 @@ const ForecastChart = ({ forecastData, bestTime, selectedAppliance, currentRegio
     );
   }
 
-  const getSegmentColor = (context, isPoint) => {
-    if (!isPoint && !context.p0) return COLOR_DEFAULT;
-    const index = isPoint ? context.dataIndex : context.p0.dataIndex;
-    if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index < bestTimeEndIndex) {
-      return COLOR_BEST;
-    }
-    if (index === 0) return COLOR_CURRENT;
-    return COLOR_DEFAULT;
-  };
-
-  const getPointColor = (context) => {
-    const index = context.dataIndex;
-    if (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index <= bestTimeEndIndex) {
-      return COLOR_BEST;
-    }
-    if (index === 0) return COLOR_CURRENT;
-    return COLOR_DEFAULT;
-  }
-
+  // 2. SIMPLIFIED DATA AND OPTIONS
   const chartData = {
-    labels: forecastData.map(d => new Date(d.from).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })),
+    labels: forecastData.map(d => new Date(d.from).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })),
     datasets: [{
       label: 'Carbon Intensity Forecast (gCO₂/kWh)',
       data: forecastData.map(d => d.intensity.forecast),
-      tension: 0.2,
-      borderColor: (context) => getSegmentColor(context, false),
-      pointBackgroundColor: (context) => getPointColor(context),
-      pointRadius: (context) => {
-        const index = context.dataIndex;
-        if (index === 0 || (bestTimeStartIndex !== null && index >= bestTimeStartIndex && index <= bestTimeEndIndex)) {
-            return 3;
-        }
-        return 1;
-      },
+      tension: 0.4,
+      borderColor: '#a0aec0', // A single neutral color for the line
+      pointBackgroundColor: (context) => context.dataIndex === 0 ? '#ff9800' : '#a0aec0', // Highlight only the first point
+      pointRadius: (context) => context.dataIndex === 0 ? 5 : 0, // Show only the first point
       pointHoverRadius: 5,
     }],
   };
@@ -75,17 +89,31 @@ const ForecastChart = ({ forecastData, bestTime, selectedAppliance, currentRegio
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     plugins: {
       legend: { position: 'top', labels: { color: '#f0f0f0' } },
-      title: { display: true, text: `${currentRegionName} 48-Hour Carbon Intensity Forecast`, color: '#f0f0f0' }, 
+      title: { display: true, text: `${currentRegionName} 48-Hour Carbon Intensity Forecast`, color: '#f0f0f0', font: {size: 16} },
+      // 3. PASS THE HIGHLIGHT INDICES TO OUR CUSTOM PLUGIN
+      selectionHighlighter: {
+        highlightStartIndex,
+        highlightEndIndex
+      }
     },
     scales: {
       y: { beginAtZero: false, ticks: { color: '#a9a9a9' }, grid: { color: 'rgba(240, 240, 240, 0.1)' } },
-      x: { ticks: { color: '#a9a9a9' }, grid: { color: 'rgba(240, 240, 240, 0.1)' } }
+      x: { ticks: { color: '#a9a9a9', maxRotation: 0, minRotation: 0, autoSkip: true, maxTicksLimit: 20 }, grid: { color: 'rgba(240, 240, 240, 0.05)' } }
     },
   };
 
-  return <div style={{ height: '400px' }}><Line options={options} data={chartData} /></div>;
+  // 4. PASS THE PLUGIN TO THE CHART COMPONENT
+  return (
+    <div style={{ height: '400px' }}>
+      <Line options={options} data={chartData} plugins={[selectionHighlighter]} />
+    </div>
+  );
 };
 
 export default ForecastChart;

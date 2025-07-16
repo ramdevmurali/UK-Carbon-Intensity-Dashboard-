@@ -1,7 +1,7 @@
 // frontend/src/components/SmartRecommendations.js
 
 import React from 'react';
-import styles from './SmartRecommendations.module.css'; // 1. Import the CSS module
+import styles from './SmartRecommendations.module.css';
 
 // --- Helper Functions ---
 const formatTime = (isoString) => {
@@ -13,11 +13,25 @@ const formatTime = (isoString) => {
 };
 
 // --- Sub-component for a single card ---
-const RecommendationCard = ({ recommendation }) => {
+// 1. It now accepts `onSelect` and `isActive` props
+const RecommendationCard = ({ recommendation, onSelect, isActive }) => {
   const { appliance, window } = recommendation;
-  // 2. Use the imported styles object
+  
+  // 2. A click handler that calls the passed-in onSelect function
+  const handleClick = () => {
+    // If this card is already active, clicking again will deselect it.
+    if (isActive) {
+      onSelect(null);
+    } else {
+      onSelect(window);
+    }
+  };
+
+  // 3. Dynamically build the class name to include `active` style
+  const cardClassName = `${styles.recommendationCard} ${isActive ? styles.active : ''}`;
+
   return (
-    <div className={styles.recommendationCard}>
+    <div className={cardClassName} onClick={handleClick}>
       <div className={styles.cardHeader}>
         <h3>{appliance.name}</h3>
       </div>
@@ -47,7 +61,8 @@ const RecommendationCard = ({ recommendation }) => {
 };
 
 // --- Main Component ---
-const SmartRecommendations = ({ recommendations, isLoading }) => {
+// 4. Accept the new props: onWindowSelect and selectedWindow
+const SmartRecommendations = ({ recommendations, isLoading, onWindowSelect, selectedWindow }) => {
   const renderContent = () => {
     if (isLoading) {
       return <div className={styles.loadingMessage}>Finding best times for your appliances...</div>;
@@ -64,7 +79,13 @@ const SmartRecommendations = ({ recommendations, isLoading }) => {
     return (
       <div className={styles.recommenderGrid}>
         {recommendations.map((rec, index) => (
-          <RecommendationCard key={index} recommendation={rec} />
+          <RecommendationCard
+            key={index}
+            recommendation={rec}
+            // 5. Pass down the handler and check if this card is the active one
+            onSelect={onWindowSelect}
+            isActive={selectedWindow && selectedWindow.startTime === rec.window.startTime}
+          />
         ))}
       </div>
     );
@@ -73,6 +94,7 @@ const SmartRecommendations = ({ recommendations, isLoading }) => {
   return (
     <div className={styles.recommenderContainer}>
       <header className={styles.recommenderHeader}>
+        {/* SVG Icon is unchanged */}
         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793l-1.146-1.147a.5.5 0 0 0-.708.708l2 2a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 10.293V6.5z"/>
           <path d="M12.99 7.404c.338.253.622.568.854.924a.5.5 0 0 0 .832-.546A5.022 5.022 0 0 0 13.045 6.3a.5.5 0 0 0-.588.79zM15 8a.5.5 0 0 0-.832-.361c-.23.356-.514.671-.854.924a.5.5 0 0 0 .588.79 4.022 4.022 0 0 1 1.098-1.353zM10.37 5.14c.48.243.91.564 1.28.945a.5.5 0 0 0 .71-.707 5.002 5.002 0 0 0-1.688-1.21.5.5 0 0 0-.404.872zM12.127 3.56a.5.5 0 0 0 .404-.872A6.002 6.002 0 0 0 9.29 1.628a.5.5 0 0 0 .51.864 5 5 0 0 1 2.326 1.068z"/>

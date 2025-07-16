@@ -20,8 +20,12 @@ export const useCarbonData = () => {
   const [regions, setRegions] = useState([]);
   const [selectedRegion, setSelectedRegion] = useState('National');
   
-  // --- NEW: Smart Recommender state ---
+  // Smart Recommender state
   const [applianceRecommendations, setApplianceRecommendations] = useState([]);
+  
+  // State for chart highlighting
+  const [selectedWindow, setSelectedWindow] = useState(null);
+
 
   // Loading and Error states
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
@@ -73,10 +77,9 @@ export const useCarbonData = () => {
     }
   }, []);
 
-  // --- NEW: Function to fetch recommendations ---
   const fetchRecommendations = useCallback(async (region) => {
     setIsLoadingRecommendations(true);
-    setApplianceRecommendations([]); // Clear old recommendations on new fetch
+    setApplianceRecommendations([]);
     try {
       const params = new URLSearchParams();
       if (region && region !== 'National') {
@@ -91,18 +94,15 @@ export const useCarbonData = () => {
       setApplianceRecommendations(data);
     } catch (err) {
       console.error("Error fetching recommendations:", err);
-      // Can set a specific recommendation error state if needed in the future
       setApplianceRecommendations([]); 
     } finally {
       setIsLoadingRecommendations(false);
     }
-  }, []); // This useCallback has no dependencies as it's self-contained
+  }, []);
 
   // --- SIDE EFFECTS (useEffect) ---
   useEffect(() => {
-    // Effect for initial load and periodic refresh
     const initialLoad = async () => {
-      // Fetch regions list first
       try {
         const regionsResponse = await fetch(`${API_BASE_URL}/api/v1/regions`);
         if (!regionsResponse.ok) throw new Error('Could not fetch regions');
@@ -112,21 +112,18 @@ export const useCarbonData = () => {
         setError('Could not fetch available regions.');
       }
 
-      // Fetch initial data for National view
       const { currentData, forecastArr, generationMix, error: initialError } = await fetchData('National');
       setIntensityData(currentData);
       setForecastData(forecastArr);
       setNationalGenerationMix(generationMix);
       setError(initialError || '');
       
-      // Fetch initial recommendations for National view
       fetchRecommendations('National');
     };
 
     initialLoad();
 
     const intervalId = setInterval(async () => {
-      // Periodic refresh of all data for the currently selected region
       const { currentData, forecastArr, generationMix, error: periodicError } = await fetchData(selectedRegion);
       if (selectedRegion === 'National') {
         setIntensityData(currentData);
@@ -139,17 +136,18 @@ export const useCarbonData = () => {
         setRegionalGenerationMix(generationMix);
         setRegionError(periodicError || '');
       }
-      // Also refresh recommendations periodically
       fetchRecommendations(selectedRegion);
-    }, 1800000); // Refresh every 30 mins, as forecast data doesn't change more frequently
+    }, 1800000);
 
     return () => clearInterval(intervalId);
-  }, []); // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally run only once on mount
 
   useEffect(() => {
-    // Effect for handling region changes by the user
     const updateOnRegionChange = async () => {
-      // Fetch main data for the new region
+      // Clear any selected window when the region changes
+      setSelectedWindow(null); 
+      
       const { currentData, forecastArr, generationMix, error: regionalFetchError } = await fetchData(selectedRegion);
       if (selectedRegion === 'National') {
         setRegionalIntensityData(null);
@@ -162,7 +160,6 @@ export const useCarbonData = () => {
         setRegionalGenerationMix(generationMix);
         setRegionError(regionalFetchError || '');
       }
-      // Always fetch new recommendations when the region changes
       fetchRecommendations(selectedRegion);
     };
 
@@ -171,7 +168,7 @@ export const useCarbonData = () => {
 
   // --- DERIVED DATA ---
   const displayIntensityData = selectedRegion === 'National' ? intensityData : regionalIntensityData;
-  const displayForecastData = selectedRegion === 'National' ? forecastData : regionalForecastData;
+  const displayForecastData = selectedRegion === 'National' ? forecastData : regionalForecastData; // THE FIX IS HERE
   const displayGenerationMix = selectedRegion === 'National' ? nationalGenerationMix : regionalGenerationMix;
   const displayRegionName = selectedRegion === 'National' ? 'UK' : selectedRegion;
 
@@ -184,17 +181,18 @@ export const useCarbonData = () => {
       displayForecastData,
       displayGenerationMix,
       displayRegionName,
-      applianceRecommendations, // NEW
+      applianceRecommendations,
+      selectedWindow,
     },
     state: {
-      isLoadingRecommendations, // NEW
+      isLoadingRecommendations,
       isLoadingRegionData,
       error,
       regionError,
     },
     actions: {
       setSelectedRegion,
-      // `handlePresetClick` is now removed
+      setSelectedWindow,
     }
   };
 };
