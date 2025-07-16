@@ -1,6 +1,7 @@
 // frontend/src/components/TimeOptimizer.js
 
 import React from 'react';
+import './TimeOptimizer.css'; // <-- ADD THIS LINE
 
 const APPLIANCE_PRESETS = [
   { name: 'Washing Machine', duration: 120, power_kw: 0.5 },

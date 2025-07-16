@@ -1,6 +1,7 @@
 // frontend/src/components/RegionSelector.js
 
 import React from 'react';
+import './RegionSelector.css';
 
 const RegionSelector = ({ regions, selectedRegion, onRegionChange, isLoading, regionError, displayName }) => {
   return (

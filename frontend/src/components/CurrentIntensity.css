@@ -1,0 +1,32 @@
+/* frontend/src/components/CurrentIntensity.css */
+
+.intensity-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center content vertically */
+    align-items: center;    /* Center content horizontally */
+  }
+  
+  .hero-value {
+    font-size: 5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-primary);
+    margin: 10px 0;
+  }
+  
+  .hero-unit {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+  
+  .intensity-badge {
+    padding: 10px 25px;
+    border-radius: 50px; /* Pill shape */
+    color: white;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 1.2rem;
+    display: inline-block;
+  }

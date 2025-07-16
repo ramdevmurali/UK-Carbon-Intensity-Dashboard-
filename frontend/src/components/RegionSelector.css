@@ -1,0 +1,42 @@
+/* frontend/src/components/RegionSelector.css */
+
+.location-selector {
+    /* Use max-width to align with the wider elements like the forecast chart */
+    max-width: 900px;
+    margin-bottom: 20px;
+  }
+  
+  .region-selector-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 10px; /* Add some space below the h2 */
+  }
+  
+  .region-selector-controls label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  
+  .region-dropdown {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  
+  .region-dropdown:hover {
+    border-color: var(--accent-color);
+  }
+  
+  .region-dropdown:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
