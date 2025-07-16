@@ -6,8 +6,9 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ./backend:/app
-    # --- ADD THIS HEALTHCHECK BLOCK ---
+      # --- THIS IS THE FIX ---
+      # Mount the local backend code into the 'backend' subdirectory inside the container
+      - ./backend:/app/backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/"]
       interval: 10s

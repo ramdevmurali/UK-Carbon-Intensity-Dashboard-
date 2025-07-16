@@ -1,3 +1,7 @@
 fastapi
-uvicorn[standard]
+uvicorn
+httpx
 requests
+pandas
+scikit-learn
+joblib

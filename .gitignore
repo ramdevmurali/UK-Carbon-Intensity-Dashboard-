@@ -16,3 +16,6 @@ build/
 
 # OS-generated files
 .DS_Store
+# Generated data and model files
+/backend/data/*.csv
+/backend/*.pkl
