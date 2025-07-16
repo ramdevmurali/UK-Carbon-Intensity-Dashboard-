@@ -1,0 +1,10 @@
+# Ignore IDE and Python cache files
+__pycache__/
+*.pyc
+
+# Ignore virtual environment
+.venv/
+
+# Ignore development notebooks and large data files from the image
+notebooks/
+data/
