@@ -1,7 +1,6 @@
 # UK Carbon Intensity Dashboard: A Full-Stack, ML-Enhanced Energy Optimization System
 
-**Principal Investigator:** Ramdev Murali
-**Date of Submission:** January 2026
+
 
 ---
 
